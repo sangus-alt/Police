@@ -119,6 +119,11 @@ const Vehicule = sequelize.define('Vehicule', {
     type: DataTypes.TEXT,
     allowNull: true
   },
+  administration_proprietaire: {
+    type: DataTypes.STRING(200),
+    allowNull: true,
+    comment: 'Nom de l\'administration propriétaire si applicable'
+  },
   date_mise_circulation: {
     type: DataTypes.DATEONLY,
     allowNull: true
@@ -132,6 +137,11 @@ const Vehicule = sequelize.define('Vehicule', {
     allowNull: true,
     unique: true
   },
+  carte_grise_photo: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+    comment: 'Photo de la carte grise'
+  },
   assurance_compagnie: {
     type: DataTypes.STRING(150),
     allowNull: true
@@ -143,6 +153,11 @@ const Vehicule = sequelize.define('Vehicule', {
   date_expiration_assurance: {
     type: DataTypes.DATEONLY,
     allowNull: true
+  },
+  assurance_photo: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+    comment: 'Photo de l\'attestation d\'assurance'
   },
   visite_technique_valide: {
     type: DataTypes.BOOLEAN,
@@ -156,6 +171,26 @@ const Vehicule = sequelize.define('Vehicule', {
   centre_visite: {
     type: DataTypes.STRING(150),
     allowNull: true
+  },
+  visite_technique_photo: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+    comment: 'Photo du certificat de visite technique'
+  },
+  permis_conduire_numero: {
+    type: DataTypes.STRING(50),
+    allowNull: true,
+    comment: 'Numéro de permis de conduire du propriétaire principal'
+  },
+  permis_conduire_categorie: {
+    type: DataTypes.STRING(20),
+    allowNull: true,
+    comment: 'Catégorie du permis de conduire'
+  },
+  permis_conduire_photo: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+    comment: 'Photo du permis de conduire'
   },
   statut: {
     type: DataTypes.ENUM('actif', 'suspendu', 'vole', 'accident', 'detruit', 'export', 'archive'),
@@ -172,10 +207,20 @@ const Vehicule = sequelize.define('Vehicule', {
     allowNull: true,
     comment: 'Chemin vers la photo de profil du véhicule'
   },
+  photo_arriere: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+    comment: 'Chemin vers la photo arrière du véhicule'
+  },
+  photo_interieur: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+    comment: 'Chemin vers la photo intérieur du véhicule'
+  },
   photos_supplementaires: {
     type: DataTypes.JSON,
     allowNull: true,
-    comment: 'Photos supplémentaires du véhicule'
+    comment: 'Photos supplémentaires du véhicule et documents'
   },
   caracteristiques_speciales: {
     type: DataTypes.JSON,
@@ -199,6 +244,15 @@ const Vehicule = sequelize.define('Vehicule', {
     allowNull: true,
     comment: 'Dernière vérification par les forces de l\'ordre'
   },
+  agent_derniere_verification_id: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'users',
+      key: 'id'
+    },
+    comment: 'Agent ayant effectué la dernière vérification'
+  },
   signalement_actif: {
     type: DataTypes.BOOLEAN,
     allowNull: false,
@@ -208,6 +262,23 @@ const Vehicule = sequelize.define('Vehicule', {
   motif_signalement: {
     type: DataTypes.TEXT,
     allowNull: true
+  },
+  date_signalement: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  agent_signalement_id: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'users',
+      key: 'id'
+    }
+  },
+  qr_code: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+    comment: 'QR Code généré pour identification rapide'
   },
   created_by: {
     type: DataTypes.INTEGER,
@@ -227,7 +298,19 @@ const Vehicule = sequelize.define('Vehicule', {
       fields: ['numero_chassis']
     },
     {
+      fields: ['numero_carte_grise']
+    },
+    {
       fields: ['proprietaire_cni']
+    },
+    {
+      fields: ['proprietaire_nom']
+    },
+    {
+      fields: ['administration_proprietaire']
+    },
+    {
+      fields: ['permis_conduire_numero']
     },
     {
       fields: ['statut']
@@ -237,6 +320,10 @@ const Vehicule = sequelize.define('Vehicule', {
     },
     {
       fields: ['signalement_actif']
+    },
+    {
+      // Index composé pour recherche rapide
+      fields: ['plaque_immatriculation', 'proprietaire_nom', 'numero_carte_grise']
     }
   ]
 });
@@ -246,6 +333,16 @@ Vehicule.associate = function(models) {
   Vehicule.belongsTo(models.User, {
     foreignKey: 'created_by',
     as: 'createur'
+  });
+  
+  Vehicule.belongsTo(models.User, {
+    foreignKey: 'agent_derniere_verification_id',
+    as: 'agent_derniere_verification'
+  });
+  
+  Vehicule.belongsTo(models.User, {
+    foreignKey: 'agent_signalement_id',
+    as: 'agent_signalement'
   });
   
   Vehicule.hasMany(models.Verbalisation, {
@@ -300,66 +397,136 @@ Vehicule.prototype.getDocumentsExpires = function() {
   return expires;
 };
 
-Vehicule.prototype.getProchaines = function(joursAvance = 30) {
-  const limite = new Date();
-  limite.setDate(limite.getDate() + joursAvance);
-  
-  const prochaines = [];
-  
-  if (this.date_expiration_assurance && this.date_expiration_assurance <= limite) {
-    prochaines.push({
-      type: 'assurance',
-      date: this.date_expiration_assurance
-    });
-  }
-  
-  if (this.date_expiration_visite && this.date_expiration_visite <= limite) {
-    prochaines.push({
-      type: 'visite_technique',
-      date: this.date_expiration_visite
-    });
-  }
-  
-  if (this.date_expiration_carte_grise && this.date_expiration_carte_grise <= limite) {
-    prochaines.push({
-      type: 'carte_grise',
-      date: this.date_expiration_carte_grise
-    });
-  }
-  
-  return prochaines.sort((a, b) => a.date - b.date);
-};
-
-Vehicule.prototype.signalerVol = function(motif) {
+Vehicule.prototype.signalerVol = function(motif, agentId) {
   this.statut = 'vole';
   this.signalement_actif = true;
   this.motif_signalement = motif;
+  this.date_signalement = new Date();
+  this.agent_signalement_id = agentId;
   return this.save();
 };
 
 Vehicule.prototype.leverSignalement = function() {
   this.signalement_actif = false;
   this.motif_signalement = null;
+  this.date_signalement = null;
+  this.agent_signalement_id = null;
   if (this.statut === 'vole') {
     this.statut = 'actif';
   }
   return this.save();
 };
 
-// Méthodes de classe
-Vehicule.rechercherParPlaque = function(plaque) {
-  return this.findOne({
-    where: { plaque_immatriculation: plaque },
+Vehicule.prototype.genererQRCode = function() {
+  const data = {
+    plaque: this.plaque_immatriculation,
+    chassis: this.numero_chassis,
+    proprietaire: this.proprietaire_nom,
+    id: this.id
+  };
+  this.qr_code = JSON.stringify(data);
+  return this.save();
+};
+
+// Méthodes de classe avec filtres rapides
+Vehicule.rechercheRapide = function(query) {
+  if (!query || query.length < 2) {
+    return this.findAll({ limit: 20, order: [['created_at', 'DESC']] });
+  }
+  
+  const searchQuery = `%${query.toUpperCase()}%`;
+  
+  return this.findAll({
+    where: {
+      [Op.or]: [
+        { plaque_immatriculation: { [Op.iLike]: searchQuery } },
+        { numero_carte_grise: { [Op.iLike]: searchQuery } },
+        { numero_chassis: { [Op.iLike]: searchQuery } },
+        { proprietaire_nom: { [Op.iLike]: searchQuery } },
+        { proprietaire_cni: { [Op.iLike]: searchQuery } },
+        { administration_proprietaire: { [Op.iLike]: searchQuery } },
+        { permis_conduire_numero: { [Op.iLike]: searchQuery } }
+      ]
+    },
     include: [
       { model: sequelize.models.User, as: 'createur', attributes: ['nom', 'prenoms'] }
-    ]
+    ],
+    order: [['created_at', 'DESC']],
+    limit: 50
+  });
+};
+
+Vehicule.filtreParPlaque = function(plaque) {
+  return this.findAll({
+    where: {
+      plaque_immatriculation: { [Op.iLike]: `%${plaque}%` }
+    },
+    order: [['plaque_immatriculation', 'ASC']]
+  });
+};
+
+Vehicule.filtreParCarteGrise = function(numeroCarteGrise) {
+  return this.findAll({
+    where: {
+      numero_carte_grise: { [Op.iLike]: `%${numeroCarteGrise}%` }
+    },
+    order: [['numero_carte_grise', 'ASC']]
+  });
+};
+
+Vehicule.filtreParPermis = function(numeroPermis) {
+  return this.findAll({
+    where: {
+      permis_conduire_numero: { [Op.iLike]: `%${numeroPermis}%` }
+    },
+    order: [['permis_conduire_numero', 'ASC']]
+  });
+};
+
+Vehicule.filtreParProprietaire = function(nomProprietaire) {
+  return this.findAll({
+    where: {
+      [Op.or]: [
+        { proprietaire_nom: { [Op.iLike]: `%${nomProprietaire}%` } },
+        { proprietaire_prenoms: { [Op.iLike]: `%${nomProprietaire}%` } }
+      ]
+    },
+    order: [['proprietaire_nom', 'ASC']]
+  });
+};
+
+Vehicule.filtreParAdministration = function(administration) {
+  return this.findAll({
+    where: {
+      administration_proprietaire: { [Op.iLike]: `%${administration}%` }
+    },
+    order: [['administration_proprietaire', 'ASC']]
   });
 };
 
 Vehicule.vehiculesSignales = function() {
   return this.findAll({
     where: { signalement_actif: true },
-    order: [['updated_at', 'DESC']]
+    include: [
+      { model: sequelize.models.User, as: 'agent_signalement', attributes: ['nom', 'prenoms'] }
+    ],
+    order: [['date_signalement', 'DESC']]
+  });
+};
+
+Vehicule.vehiculesAvecPhotos = function() {
+  return this.findAll({
+    where: {
+      [Op.or]: [
+        { photo_face: { [Op.ne]: null } },
+        { photo_profil: { [Op.ne]: null } },
+        { photo_arriere: { [Op.ne]: null } },
+        { carte_grise_photo: { [Op.ne]: null } },
+        { assurance_photo: { [Op.ne]: null } },
+        { permis_conduire_photo: { [Op.ne]: null } }
+      ]
+    },
+    order: [['created_at', 'DESC']]
   });
 };
 
@@ -377,6 +544,20 @@ Vehicule.documentsExpirant = function(jours = 30) {
       statut: 'actif'
     },
     order: [['date_expiration_assurance', 'ASC']]
+  });
+};
+
+Vehicule.statistiquesPhotos = function() {
+  return this.findAll({
+    attributes: [
+      [sequelize.fn('COUNT', sequelize.col('id')), 'total'],
+      [sequelize.fn('COUNT', sequelize.col('photo_face')), 'avec_photo_face'],
+      [sequelize.fn('COUNT', sequelize.col('photo_profil')), 'avec_photo_profil'],
+      [sequelize.fn('COUNT', sequelize.col('carte_grise_photo')), 'avec_carte_grise'],
+      [sequelize.fn('COUNT', sequelize.col('assurance_photo')), 'avec_assurance'],
+      [sequelize.fn('COUNT', sequelize.col('permis_conduire_photo')), 'avec_permis']
+    ],
+    raw: true
   });
 };
 
