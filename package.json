@@ -1,0 +1,35 @@
+{
+  "name": "police-main-courante-gabon",
+  "version": "1.0.0",
+  "description": "Logiciel de gestion de la main courante des forces de l'ordre du Gabon",
+  "main": "index.js",
+  "scripts": {
+    "install:backend": "cd backend && npm install",
+    "install:frontend": "cd frontend && npm install",
+    "install:all": "npm run install:backend && npm run install:frontend",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm start",
+    "dev:all": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "build:frontend": "cd frontend && npm run build",
+    "start:backend": "cd backend && npm start",
+    "start:frontend": "cd frontend && npm run serve",
+    "docker:build": "docker-compose build",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down"
+  },
+  "keywords": [
+    "police",
+    "gestion",
+    "main-courante",
+    "gabon",
+    "forces-ordre",
+    "angular",
+    "nodejs",
+    "mysql"
+  ],
+  "author": "Forces de l'Ordre Gabon",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
