@@ -1,35 +1,91 @@
 {
   "name": "police-main-courante-gabon",
-  "version": "1.0.0",
-  "description": "Logiciel de gestion de la main courante des forces de l'ordre du Gabon",
+  "version": "2.0.0",
+  "description": "Système de gestion de main courante des forces de l'ordre du Gabon",
   "main": "index.js",
   "scripts": {
+    "install:all": "npm run install:backend && npm run install:frontend",
     "install:backend": "cd backend && npm install",
     "install:frontend": "cd frontend && npm install",
-    "install:all": "npm run install:backend && npm run install:frontend",
+    
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:backend": "cd backend && npm run dev",
     "dev:frontend": "cd frontend && npm start",
-    "dev:all": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
-    "build:frontend": "cd frontend && npm run build",
+    
+    "start": "concurrently \"npm run start:backend\" \"npm run start:frontend\"",
     "start:backend": "cd backend && npm start",
-    "start:frontend": "cd frontend && npm run serve",
+    "start:frontend": "cd frontend && npm run build:prod && cd dist && npx http-server -p 4200",
+    
+    "build": "npm run build:backend && npm run build:frontend",
+    "build:backend": "cd backend && npm run build",
+    "build:frontend": "cd frontend && npm run build:prod",
+    
+    "test": "npm run test:backend && npm run test:frontend",
+    "test:backend": "cd backend && npm test",
+    "test:frontend": "cd frontend && npm test",
+    
+    "lint": "npm run lint:backend && npm run lint:frontend",
+    "lint:backend": "cd backend && npm run lint",
+    "lint:frontend": "cd frontend && npm run lint",
+    
+    "clean": "npm run clean:backend && npm run clean:frontend",
+    "clean:backend": "cd backend && rm -rf node_modules dist logs",
+    "clean:frontend": "cd frontend && rm -rf node_modules dist .angular",
+    
     "docker:build": "docker-compose build",
     "docker:up": "docker-compose up -d",
-    "docker:down": "docker-compose down"
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f",
+    
+    "setup:dev": "chmod +x scripts/install-localhost.sh && ./scripts/install-localhost.sh",
+    "setup:docker": "chmod +x scripts/install-docker.sh && ./scripts/install-docker.sh",
+    
+    "backup": "node scripts/backup.js",
+    "restore": "node scripts/restore.js",
+    
+    "postinstall": "echo '🚔 Police Main Courante Gabon installé! Utilisez npm run setup:dev pour démarrer.'"
   },
   "keywords": [
     "police",
-    "gestion",
-    "main-courante",
     "gabon",
+    "main-courante",
+    "gestion",
     "forces-ordre",
-    "angular",
-    "nodejs",
-    "mysql"
+    "securite",
+    "administration"
   ],
-  "author": "Forces de l'Ordre Gabon",
-  "license": "MIT",
+  "author": "Police Nationale Gabonaise",
+  "license": "PROPRIETARY",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/police-gabon/main-courante"
+  },
+  "bugs": {
+    "url": "https://github.com/police-gabon/main-courante/issues"
+  },
+  "homepage": "https://github.com/police-gabon/main-courante#readme",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "http-server": "^14.1.1",
+    "nodemon": "^3.0.1"
+  },
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "config": {
+    "database": {
+      "name": "police_main_courante",
+      "user": "police_user",
+      "password": "SecurePassword123!"
+    },
+    "ports": {
+      "backend": 3000,
+      "frontend": 4200
+    }
   }
 }
